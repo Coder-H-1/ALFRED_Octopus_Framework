@@ -1,0 +1,43 @@
+// Octopus Framework - Example Module File
+// Extension: .oct
+// This file demonstrates the custom syntax used to define new functionality.
+
+module "ExampleBasics"
+
+// 1. Simple Response
+// Triggered if "framework greeting" is found in the user's command
+command "framework greeting" {
+    response "Hello! I am responding from the Octopus Framework."
+}
+
+// 2. System Command Execution
+// Triggered if "open paint" is found in the user's command
+command "open paint" {
+    system "start mspaint"
+    response "I have opened Microsoft Paint for you, sir."
+}
+
+// 2b. System Command Execution using LLM Response
+// Triggered if "open notepad" is found.
+// The Framework supplies the string to ALFRED's ALREADY LOADED LLM to generate the final response dynamically!
+command "open notepad" {
+    system "start notepad"
+    response generate ( "A brief polite response confirming you opened notepad for the user" )
+}
+
+// 3. Native Python Logic
+// Triggered if "calculate square" is found.
+// You can use a 'python' block for advanced functionality. 
+// The variable 'command' (the full user input string) is automatically available to your Python scope.
+command "calculate square" {
+    python {
+        import re
+        # Look for numbers in the command
+        match = re.search(r'\d+', command)
+        if match:
+            val = int(match.group())
+            return f"The square of {val} is {val * val}"
+        else:
+            return "Could you please specify the number you want to square?"
+    }
+}
