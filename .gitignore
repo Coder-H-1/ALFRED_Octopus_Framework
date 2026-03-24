@@ -1,2 +1,2 @@
 git_use.md
-.gitignore
+__pycache__

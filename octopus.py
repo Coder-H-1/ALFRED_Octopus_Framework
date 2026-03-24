@@ -2,6 +2,7 @@ import os
 import sys
 import socket
 import re
+import subprocess
 
 PORT = 65432
 HOST = '127.0.0.1'
@@ -74,8 +75,9 @@ def compile_oct_file(filepath: str) -> str:
                     python_code.append(f"        return \"{resp_match.group(1)}\"")
 
             elif stripped.startswith("system"):
-                sys_cmd = re.search(r'system\s+"(.*)"', line).group(1)
-                python_code.append(f"        os.system(\"{sys_cmd}\")")
+                sys_match = re.search(r'system\s+"(.*)"', line)
+                if sys_match:
+                    python_code.append(f"        os.system(\"{sys_match.group(1)}\")")
 
             elif stripped.startswith("python {"):
                 in_python_block = True
@@ -133,16 +135,54 @@ def save_compiled(filename: str, payload: str):
         f.write(payload)
     print(f"Compiled plugin natively saved to: {save_path}")
 
+def add_function(name: str):
+    """Creates a new .oct file template."""
+    if not name.endswith(".oct"):
+        name += ".oct"
+    path = os.path.join(os.path.dirname(__file__), name)
+    if os.path.exists(path):
+        print(f"Error: {name} already exists.")
+        return
+    template = f'module "{name.replace(".oct","")}"\n\ncommand "hello {name.replace(".oct","")}" {{\n    response "Hello from {name}"\n}}\n'
+    with open(path, "w") as f:
+        f.write(template)
+    print(f"Successfully created function: {name}")
+
+def delete_function(name: str):
+    """Deletes a .oct file and its compiled plugin."""
+    if not name.endswith(".oct"):
+        name += ".oct"
+    oct_path = os.path.join(os.path.dirname(__file__), name)
+    py_path = os.path.join(os.path.dirname(__file__), "compiled_plugins", name.replace(".oct", ".py"))
+    
+    deleted = False
+    if os.path.exists(oct_path):
+        os.remove(oct_path)
+        print(f"Deleted source: {oct_path}")
+        deleted = True
+    if os.path.exists(py_path):
+        os.remove(py_path)
+        print(f"Deleted compiled: {py_path}")
+        deleted = True
+    
+    if not deleted:
+        print(f"Error: Could not find function '{name}' to delete.")
+
 def main():
     if len(sys.argv) > 1:
         cmd = " ".join(sys.argv[1:])
+        # ... logic for CLI ...
         if cmd == "status":
             status_check()
+        elif cmd.startswith("add "):
+            add_function(cmd.split(" ", 1)[1])
+        elif cmd.startswith("delete "):
+            delete_function(cmd.split(" ", 1)[1])
         elif cmd.startswith("load "):
             parts = cmd.split(" ", 1)
             if len(parts) > 1:
                 filepath = parts[1]
-                if "\\\\" not in filepath and "/" not in filepath:
+                if "\\" not in filepath and "/" not in filepath:
                      filepath = os.path.join(os.path.dirname(__file__), filepath)
                 print(f"Compiling {filepath}...")
                 payload = compile_oct_file(filepath)
@@ -154,39 +194,33 @@ def main():
                 print("Missing filename to load.")
         return
 
-    print("Welcome to Octopus Framework CLI")
-    print("Commands: 'load <filename.oct>', 'status', 'exit'")
-    
-    while True:
-        try:
-            cmd = input("octopus> ").strip()
-            if not cmd:
-                continue
-                
-            if cmd == "exit":
-                break
-                
-            elif cmd == "status":
-                status_check()
-                
-            elif cmd.startswith("load "):
-                filepath = cmd.split(" ", 1)[1]
-                if "\\" not in filepath and "/" not in filepath:
-                     # search locally in FmWk
-                     filepath = os.path.join(os.path.dirname(__file__), filepath)
-                print(f"Compiling {filepath}...")
-                payload = compile_oct_file(filepath)
-                if payload:
-                    print("Compilation successful. Injecting into Main program...")
-                    save_compiled(filepath, payload)
-                    send_payload(payload)
-            else:
-                print("Unknown command.")
-                
-        except KeyboardInterrupt:
-            break
-        except Exception as e:
-            print(f"Error: {e}")
+    # If no arguments, launch GUI
+    try:
+        from octopus_gui import main as launch_gui
+        launch_gui()
+    except ImportError:
+        print("Welcome to Octopus Framework CLI (GUI dependencies missing)")
+        print("Commands: 'add <name>', 'delete <name>', 'load <filename.oct>', 'status', 'exit'")
+        
+        while True:
+            # ... CLI loop ...
+            try:
+                cmd = input("octopus> ").strip()
+                if not cmd or cmd == "exit": break
+                elif cmd == "status": status_check()
+                elif cmd.startswith("add "): add_function(cmd.split(" ", 1)[1])
+                elif cmd.startswith("delete "): delete_function(cmd.split(" ", 1)[1])
+                elif cmd.startswith("load "):
+                    filepath = cmd.split(" ", 1)[1]
+                    if "\\" not in filepath and "/" not in filepath:
+                        filepath = os.path.join(os.path.dirname(__file__), filepath)
+                    payload = compile_oct_file(filepath)
+                    if payload:
+                        save_compiled(filepath, payload)
+                        send_payload(payload)
+                else: print("Unknown command.")
+            except KeyboardInterrupt: break
+            except Exception as e: print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
