@@ -131,5 +131,5 @@ The framework parses `.oct` files and generates a Python payload. This payload i
 ---
 
 <p align="center">
-  The ALFRED Ecosystem.
+  The Nautilus Ecosystem.
 </p>
