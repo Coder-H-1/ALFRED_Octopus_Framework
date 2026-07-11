@@ -1,5 +1,9 @@
 import os
 import re
+try:
+    from FILES.utils import Responder
+except Exception:
+    pass
 
 # Module: ExampleBasics
 
@@ -17,6 +21,14 @@ def oct_cmd_open_paint(command):
     return None
 
 DYNAMIC_COMMANDS['open paint'] = oct_cmd_open_paint
+
+def oct_cmd_open_notepad(command):
+    if 'open notepad' in command:
+        os.system("start notepad")
+        return Responder("A brief polite response confirming you opened notepad for the user")
+    return None
+
+DYNAMIC_COMMANDS['open notepad'] = oct_cmd_open_notepad
 
 def oct_cmd_calculate_square(command):
     if 'calculate square' in command:

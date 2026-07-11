@@ -6,15 +6,17 @@ import json
 class OctopusAPI:
     def __init__(self):
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.oct_dir = os.path.join(self.base_dir, "oct")
         self.plugins_dir = os.path.join(self.base_dir, "compiled_plugins")
         self.disabled_dir = os.path.join(self.base_dir, "disabled_plugins")
+        os.makedirs(self.oct_dir, exist_ok=True)
         os.makedirs(self.plugins_dir, exist_ok=True)
         os.makedirs(self.disabled_dir, exist_ok=True)
 
     def list_functions(self):
         """Lists .oct files in the current directory."""
-        files = [f for f in os.listdir(self.base_dir) if f.endswith(".oct")]
-        return [{"name": f, "path": os.path.join(self.base_dir, f).replace('\\', '/')} for f in files]
+        files = [f for f in os.listdir(self.oct_dir) if f.endswith(".oct")]
+        return [{"name": f, "path": os.path.join(self.oct_dir, f).replace('\\', '/')} for f in files]
 
     def list_plugins(self):
         """Lists .py files in compiled_plugins (enabled) and disabled_plugins."""

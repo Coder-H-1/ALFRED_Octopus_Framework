@@ -27,8 +27,20 @@ def compile_oct_file(filepath: str) -> str:
 
     current_command = None
     in_python_block = False
+    in_function_block = False
+    in_command_uses_block = False
+    used_function = None
+    uses_args = []
+    
     python_indent_level = 0
     func_name = ""
+    cmd_func_name = ""
+
+    def process_value(val):
+        if '$' in val:
+            val = re.sub(r'\$([a-zA-Z_]\w*(?:\[.*?\])?)', r'{\1}', val)
+            return f'f"{val}"'
+        return f'"{val}"'
 
     for line in lines:
         stripped = line.strip()
@@ -37,19 +49,87 @@ def compile_oct_file(filepath: str) -> str:
         if not in_python_block and (not stripped or stripped.startswith("//")):
             continue
 
+        if not in_python_block and stripped.startswith("#define"):
+            continue
+
         if stripped.startswith("module"):
             module_name = stripped.split('"')[1]
             python_code.append(f"# Module: {module_name}\n")
             continue
 
-        if stripped.startswith("command") and "{" in stripped:
+        if stripped.startswith("function "):
+            func_match = re.search(r'function\s+([a-zA-Z_]\w*)\s*\((.*?)\)\s*\{', line)
+            if func_match:
+                in_function_block = True
+                func_name = func_match.group(1)
+                args = func_match.group(2).strip()
+                python_code.append(f"def {func_name} ( {args} ):")
+            continue
+
+        if stripped.startswith("command") and "uses" in stripped:
+            cmd_match = re.search(r'command\s+"(.*?)"\s+uses\s+([a-zA-Z_]\w*)\s*\{', line)
+            if cmd_match:
+                cmd_trigger = cmd_match.group(1)
+                used_function = cmd_match.group(2)
+                current_command = cmd_trigger
+                safe_name = re.sub(r'\W+', '_', cmd_trigger).strip('_')
+                cmd_func_name = f"oct_cmd_{safe_name}"
+                python_code.append(f"def {cmd_func_name}(command):")
+                python_code.append(f"    if '{cmd_trigger}' in command:")
+                in_command_uses_block = True
+                uses_args = []
+            continue
+
+        if stripped.startswith("command") and "{" in stripped and not in_command_uses_block:
             cmd_trigger = stripped.split('"')[1]
             current_command = cmd_trigger
-            # safe function name
             safe_name = re.sub(r'\W+', '_', cmd_trigger).strip('_')
-            func_name = f"oct_cmd_{safe_name}"
-            python_code.append(f"def {func_name}(command):")
+            cmd_func_name = f"oct_cmd_{safe_name}"
+            python_code.append(f"def {cmd_func_name}(command):")
             python_code.append(f"    if '{cmd_trigger}' in command:")
+            continue
+
+        if in_function_block:
+            if stripped == "}":
+                in_function_block = False
+                python_code.append("")
+                continue
+            
+            if stripped.startswith("system ") or stripped.startswith("start "):
+                val_str = stripped.split(" ", 1)[1].strip().strip('"')
+                val = process_value(val_str)
+                python_code.append(f"    os.system({val})")
+            elif stripped.startswith("print "):
+                val_str = stripped.split(" ", 1)[1].strip().strip('"')
+                val = process_value(val_str)
+                python_code.append(f"    print({val})")
+            elif stripped.startswith("response "):
+                val_str = stripped.split(" ", 1)[1].strip().strip('"')
+                val = process_value(val_str)
+                python_code.append(f"    return {val}")
+            else:
+                leading_spaces = len(line) - len(line.lstrip(' '))
+                user_indent = leading_spaces - 8 if leading_spaces >= 8 else 0
+                processed_line = line.lstrip().rstrip('\r\n')
+                if '$' in processed_line:
+                    processed_line = re.sub(r'\$([a-zA-Z_]\w*(?:\[.*?\])?)', r'{\1}', processed_line)
+                python_code.append(" " * (4 + user_indent) + processed_line)
+            continue
+
+        if in_command_uses_block:
+            if stripped == "}":
+                in_command_uses_block = False
+                args_str = ", ".join(uses_args)
+                python_code.append(f"        {used_function}([{args_str}])")
+                python_code.append("    return None\n")
+                python_code.append(f"DYNAMIC_COMMANDS['{current_command}'] = {cmd_func_name}\n")
+                current_command = None
+                used_function = None
+                uses_args = []
+            else:
+                arg_match = re.search(r'"(.*)"', line)
+                if arg_match:
+                    uses_args.append(f'"{arg_match.group(1)}"')
             continue
 
         if current_command and stripped == "}":
@@ -58,7 +138,7 @@ def compile_oct_file(filepath: str) -> str:
             else:
                 # End of command block
                 python_code.append("    return None\n")
-                python_code.append(f"DYNAMIC_COMMANDS['{current_command}'] = {func_name}\n")
+                python_code.append(f"DYNAMIC_COMMANDS['{current_command}'] = {cmd_func_name}\n")
                 current_command = None
             continue
 
@@ -66,18 +146,21 @@ def compile_oct_file(filepath: str) -> str:
             if stripped.startswith("response generate"):
                 resp_gen_match = re.search(r'response\s+generate\s*\(\s*"(.*?)"\s*\)', line)
                 if resp_gen_match:
-                    python_code.append(f"        return Responder(\"{resp_gen_match.group(1)}\")")
+                    val = process_value(resp_gen_match.group(1))
+                    python_code.append(f"        return Responder({val})")
 
             elif stripped.startswith("response"):
                 # Extract string between quotes properly
                 resp_match = re.search(r'response\s+"(.*)"', line)
                 if resp_match:
-                    python_code.append(f"        return \"{resp_match.group(1)}\"")
+                    val = process_value(resp_match.group(1))
+                    python_code.append(f"        return {val}")
 
             elif stripped.startswith("system"):
                 sys_match = re.search(r'system\s+"(.*)"', line)
                 if sys_match:
-                    python_code.append(f"        os.system(\"{sys_match.group(1)}\")")
+                    val = process_value(sys_match.group(1))
+                    python_code.append(f"        os.system({val})")
 
             elif stripped.startswith("python {"):
                 in_python_block = True
@@ -85,18 +168,11 @@ def compile_oct_file(filepath: str) -> str:
         elif in_python_block:
             # We preserve indentation but add 8 spaces (4 for func, 4 for if)
             # Remove the first 8 spaces or 2 tabs if present from the user's .oct file
-            # Wait, best is to just take the line, strip it, and apply 8 spaces base + whatever internal indentation.
-            # Let's count leading spaces of the original line.
             leading_spaces = len(line) - len(line.lstrip(' '))
-            # Adjust indentation (assuming 4 spaces inside python { block )
-            # We'll just prefix with 8 spaces and append the lstrip() line, but we need to keep python block indents
-            # Example: "        return val"
             if stripped == "}":
                 in_python_block = False
                 continue
                 
-            # Naive indent handling: if leading_spaces > 8 in .oct, we keep the relative diff
-            # Actually just prepend 8 spaces to whatever they wrote, minus their base indent.
             base_indent = 8 # spaces we inject
             user_indent = leading_spaces - 8 if leading_spaces >= 8 else 0
             python_code.append(" " * (8 + user_indent) + line.lstrip())
@@ -139,7 +215,7 @@ def add_function(name: str):
     """Creates a new .oct file template."""
     if not name.endswith(".oct"):
         name += ".oct"
-    path = os.path.join(os.path.dirname(__file__), name)
+    path = os.path.join(os.path.dirname(__file__), "oct", name)
     if os.path.exists(path):
         print(f"Error: {name} already exists.")
         return
@@ -152,7 +228,7 @@ def delete_function(name: str):
     """Deletes a .oct file and its compiled plugin."""
     if not name.endswith(".oct"):
         name += ".oct"
-    oct_path = os.path.join(os.path.dirname(__file__), name)
+    oct_path = os.path.join(os.path.dirname(__file__), "oct", name)
     py_path = os.path.join(os.path.dirname(__file__), "compiled_plugins", name.replace(".oct", ".py"))
     
     deleted = False
@@ -183,7 +259,7 @@ def main():
             if len(parts) > 1:
                 filepath = parts[1]
                 if "\\" not in filepath and "/" not in filepath:
-                     filepath = os.path.join(os.path.dirname(__file__), filepath)
+                     filepath = os.path.join(os.path.dirname(__file__), "oct", filepath)
                 print(f"Compiling {filepath}...")
                 payload = compile_oct_file(filepath)
                 if payload:

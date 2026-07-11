@@ -39,15 +39,24 @@ Octopus Framework is a powerful, flexible, and lightweight framework designed to
 
 1. **Prerequisites**: Ensure you have Python 3.x installed.
 2. **Dependencies**: Install the required packages for the GUI (optional for CLI):
-   ```bash
-   pip install pywebview
-   ```
+    ```bash
+    pip install pywebview
+    ```
 3. **Running the Framework**:
-   Launch the IDE (GUI) by running the main script without arguments:
-   ```bash
-   python octopus.py
-   ```
-
+    1. Launch the IDE (GUI) by running the main script without arguments:
+        ```bash
+        python octopus.py
+        ```
+    2. Running Framework without opening GUI 
+        ```bash
+        python octopus.py command <value(if-any)>
+        ```
+        Available commands:
+            'add <name>' <= Starts the plugin,
+            'delete <name>' <= Deletes the plugin,
+            'load <filename.oct>' <= Loads the plugin,
+            'status' <= Shows the status,
+            'exit' <= Exits the program
 ---
 
 ## 🎮 Usage Guide
