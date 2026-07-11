@@ -49,21 +49,22 @@ def compile_oct_file(filepath: str) -> str:
         if not in_python_block and (not stripped or stripped.startswith("//")):
             continue
 
-        if not in_python_block and stripped.startswith("#define"):
-            continue
-
         if stripped.startswith("module"):
             module_name = stripped.split('"')[1]
             python_code.append(f"# Module: {module_name}\n")
             continue
 
         if stripped.startswith("function "):
-            func_match = re.search(r'function\s+([a-zA-Z_]\w*)\s*\((.*?)\)\s*\{', line)
-            if func_match:
-                in_function_block = True
-                func_name = func_match.group(1)
-                args = func_match.group(2).strip()
+            parts = stripped.split(None, 2)
+            if len(parts) >= 2:
+                func_name = parts[1].split('(')[0].strip()
+                args = ""
+                args_match = re.search(r'\((.*?)\)', line)
+                if args_match:
+                    args = args_match.group(1).strip()
+                
                 python_code.append(f"def {func_name} ( {args} ):")
+                in_function_block = True
             continue
 
         if stripped.startswith("command") and "uses" in stripped:
@@ -90,8 +91,12 @@ def compile_oct_file(filepath: str) -> str:
             continue
 
         if in_function_block:
+            if stripped == "{":
+                continue
             if stripped == "}":
                 in_function_block = False
+                if python_code[-1].startswith("def "):
+                    python_code.append("    pass")
                 python_code.append("")
                 continue
             

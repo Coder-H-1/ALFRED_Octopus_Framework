@@ -140,5 +140,5 @@ The framework parses `.oct` files and generates a Python payload. This payload i
 ---
 
 <p align="center">
-  A.L.F.R.E.D.
+  A.L.F.R.E.D
 </p>
