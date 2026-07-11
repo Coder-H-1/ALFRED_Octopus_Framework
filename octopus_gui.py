@@ -51,7 +51,6 @@ class OctopusAPI:
         """Runs: python octopus.py load <path>"""
         try:
             filename = os.path.basename(path)
-            # We use the octopus.py script directly
             proc = subprocess.run(
                 ["python", "octopus.py", "load", filename],
                 cwd=self.base_dir,
