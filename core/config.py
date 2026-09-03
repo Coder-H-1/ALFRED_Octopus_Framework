@@ -16,19 +16,31 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "serialization": "orjson"
 }
 
+def _expand_values(val: Any) -> Any:
+    """Recursively expands environment variables (%VAR%, $VAR) and ~ user directories."""
+    if isinstance(val, str):
+        return os.path.expanduser(os.path.expandvars(val))
+    elif isinstance(val, list):
+        return [_expand_values(v) for v in val]
+    elif isinstance(val, dict):
+        return {k: _expand_values(v) for k, v in val.items()}
+    return val
+
 def load_server_config() -> Dict[str, Any]:
-    """Loads MCP server configurations and settings from mcp_servers.json."""
+    """Loads MCP server configurations and settings from mcp_servers.json with dynamic path expansion."""
     if not os.path.isfile(_CONFIG_FILE):
         return {"settings": DEFAULT_SETTINGS, "mcpServers": {}}
         
     try:
         import orjson
         with open(_CONFIG_FILE, "rb") as f:
-            return orjson.loads(f.read())
+            data = orjson.loads(f.read())
     except Exception:
         import json
         with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+
+    return _expand_values(data)
 
 def get_settings() -> Dict[str, Any]:
     """Returns active runtime settings."""

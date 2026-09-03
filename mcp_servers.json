@@ -8,7 +8,7 @@
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\VIBHA\\Desktop"],
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "%USERPROFILE%\\Desktop"],
       "enabled": false,
       "description": "Local filesystem access tool"
     },
