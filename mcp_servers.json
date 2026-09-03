@@ -1,0 +1,22 @@
+{
+  "_comment": "Octopus MCP Server Registry. External GitHub tools run via stdio with Node memory cap and 60s idle retirement.",
+  "settings": {
+    "node_max_old_space_size_mb": 64,
+    "idle_timeout_seconds": 60,
+    "aggressive_gc": true
+  },
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\VIBHA\\Desktop"],
+      "enabled": false,
+      "description": "Local filesystem access tool"
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"],
+      "enabled": false,
+      "description": "General purpose utilities and test tools"
+    }
+  }
+}

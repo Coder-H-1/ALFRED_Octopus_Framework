@@ -1,144 +1,63 @@
-<p align="center">
-  <img src="assets/logo.png" width="200" alt="Octopus Framework Logo">
-</p>
+# FmWk: Octopus MCP (Model Context Protocol)
 
-# ALFRED's Octopus Framework
-
-> **The ultimate command-driven extension system for ALFRED.**
-
-Octopus Framework is a powerful, flexible, and lightweight framework designed to add custom functionality and commands to the ALFRED ecosystem. By using a custom Domain Specific Language (DSL) with the `.oct` extension, developers can rapidly prototype and deploy new features without modifying the core system logic.
+Octopus MCP is the pluggable tool execution engine for **ALFRED**, implementing Anthropic's Model Context Protocol (MCP) standard.
 
 ---
 
-## 🚀 Key Features
+## Architecture Overview
 
-- **🎯 Custom DSL**: Intuitive syntax for defining modules and commands.
-- **🐍 Python Integration**: Embed native Python logic directly within command blocks for complex operations.
-- **🤖 LLM-Powered Responses**: Generate dynamic, human-like responses using ALFRED's integrated Large Language Model.
-- **🖥️ Dual Interface**: Manage your framework via a robust **CLI** or a modern **Visual IDE (GUI)**.
-- **⚡ Hot Reloading**: Plugins are compiled and injected into the main program in real-time.
-- **📦 Plugin Management**: Easy toggling between enabled and disabled plugin states.
+1. **Intermediary Bridge (`FmWk/bridge.py`)**:
+   - Manages an isolated `asyncio` event loop in a daemon thread.
+   - Provides a strictly synchronous API for ALFRED (`bridge.route_and_execute(query)` / `bridge.call_tool(name, args)`).
+   - Keeps ALFRED synchronous, fast, and free of async loop complications.
 
----
+2. **Dual-Mode Routing (Strategy B)**:
+   - **Step 1 (Fast-Path)**: Sub-1ms regex & keyword router checks obvious tool intents (`volume`, `search`, `open app`).
+   - **Step 2 (Quantized Classifier)**: Optional Qwen 4-bit / TurboQuant classifier (~200MB RAM, <30ms latency) for speech argument parsing.
+   - **Step 3 (Graceful Fallback)**: If no tool matches or if a tool fails, returns `{"handled": False}`, cascading query to ALFRED's main LLM.
 
-## 📂 Project Structure
-
-| Directory / File | Description |
-| :--- | :--- |
-| `octopus.py` | Core compiler, CLI, and socket communication bridge. |
-| `octopus_gui.py` | PyWebView-based Visual IDE for the framework. |
-| `compiled_plugins/` | Compiled `.py` files injected into the main program. |
-| `disabled_plugins/` | Inactive plugins stored for future use. |
-| `gui/` | Frontend assets for the Octopus IDE. |
-| `assets/` | Documentation assets like logos and diagrams. |
-| `*.oct` | Source files for your custom commands. |
+3. **Subprocess Pooling & Active Memory Management**:
+   - External GitHub MCP servers run over **stdio** (Node.js / Python).
+   - Injected Node memory cap: `--max-old-space-size=64`.
+   - **60-Second Idle Retirement**: Automatically terminates idle child processes and invokes `gc.collect()` to return ~200MB RAM to the OS.
+   - **orjson Serialization**: Lightning-fast JSON-RPC 2.0 communication.
 
 ---
 
-## 🛠️ Installation & Setup
+## Directory Structure
 
-1. **Prerequisites**: Ensure you have Python 3.x installed.
-2. **Dependencies**: Install the required packages for the GUI (optional for CLI):
-    ```bash
-    pip install pywebview
-    ```
-3. **Running the Framework**:
-    1. Launch the IDE (GUI) by running the main script without arguments:
-        ```bash
-        python octopus.py
-        ```
-    2. Running Framework without opening GUI 
-        ```bash
-        python octopus.py command <value(if-any)>
-        ```
-        Available commands:
-            'add <name>' <= Starts the plugin,
-            'delete <name>' <= Deletes the plugin,
-            'load <filename.oct>' <= Loads the plugin,
-            'status' <= Shows the status,
-            'exit' <= Exits the program
----
-
-## 🎮 Usage Guide
-
-### Using the Visual IDE (GUI)
-The **Octopus Framework IDE** provides a full-featured code editor and plugin manager.
-- **Edit**: Write your `.oct` files with syntax highlighting.
-- **Compile**: Use the "Compile" button to instantly transform `.oct` into `.py`.
-- **Manage**: Toggle plugins on/off with a single click.
-
-### Using the CLI
-For power users, the framework offers a direct command-line interface:
-- **Add a template**: `python octopus.py add <name>`
-- **Delete a function**: `python octopus.py delete <name>`
-- **Compile & Load**: `python octopus.py load <filename.oct>`
-- **Check Status**: `python octopus.py status`
-
----
-
-## 📝 `.oct` Syntax Reference
-
-The Octopus Framework uses a clean, block-based syntax.
-
-### 1. Module Definition
-Every file should start with a module name.
-```oct
-module "MyNewFeature"
+```
+FmWk/
+├── bridge.py              # Intermediary Sync-Async Bridge for ALFRED
+├── mcp_servers.json       # Config registry for external GitHub stdio servers
+├── core/
+│   ├── client.py          # Fast orjson Stdio MCP Client with memory caps & idle timer
+│   ├── config.py          # Configuration and path management
+│   ├── decorators.py      # @mcp_tool decorator for native in-process tools
+│   ├── keyword_router.py  # Strategy B regex fast-path matcher
+│   └── qwen_classifier.py # Qwen 4-bit quantized classifier interface
+├── tools/                 # Native in-process Python tools (<0.5ms)
+│   ├── system_tools.py    # Volume and application launcher
+│   └── web_tools.py       # DuckDuckGo search tool
+└── README.md
 ```
 
-### 2. Basic Command & Response
-Triggers a static response when the keyword is found in the user input.
-```oct
-command "hello world" {
-    response "Greetings, User! Octopus is active."
-}
-```
+---
 
-### 3. System Execution
-Run local shell commands directly.
-```oct
-command "launch browser" {
-    system "start chrome"
-    response "Opening Chrome now."
-}
-```
+## Adding External MCP Tools from GitHub
 
-### 4. Dynamic LLM Response
-Generate a response using ALFRED's internal LLM.
-```oct
-command "tell me a joke" {
-    response generate ( "A short funny joke about octopuses" )
-}
-```
+Open `FmWk/mcp_servers.json` and add your tool definition under `mcpServers`:
 
-### 5. Advanced Python Blocks
-The `command` variable (full user string) is automatically passed to the scope.
-```oct
-command "calculate square" {
-    python {
-        import re
-        val = int(re.search(r'\d+', command).group())
-        return f"The result is {val * val}"
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\VIBHA\\Desktop"],
+      "enabled": true
     }
+  }
 }
 ```
 
----
-
-## 💡 Developer Information
-
-### Compilation Process
-The framework parses `.oct` files and generates a Python payload. This payload is then:
-1.  Saved as a `.py` file in `compiled_plugins/`.
-2.  Sent via a local socket (Port `65432`) to the "Main program" for live injection.
-
-### Socket Communication
-- **Host**: `127.0.0.1`
-- **Port**: `65432`
-- **Message Format**: Raw UTF-8 string containing the Python payload or `STATUS_CHECK` signal.
-
----
-
-<p align="center">
-  A.L.F.R.E.D
-</p>
+The bridge automatically discovers schemas, enforces memory limits, runs the tool on demand, and retires the process after 60 seconds of inactivity.
