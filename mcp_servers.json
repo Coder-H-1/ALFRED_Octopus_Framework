@@ -1,22 +1,67 @@
 {
   "_comment": "Octopus MCP Server Registry. External GitHub tools run via stdio with Node memory cap and 60s idle retirement.",
   "settings": {
-    "node_max_old_space_size_mb": 64,
-    "idle_timeout_seconds": 60,
+    "node_max_old_space_size_mb": 256,
+    "idle_timeout_seconds": 120,
     "aggressive_gc": true
   },
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "%USERPROFILE%\\Desktop"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "%USERPROFILE%\\Desktop"
+      ],
       "enabled": false,
-      "description": "Local filesystem access tool"
+      "description": "Local filesystem access tool (read, write, list files)"
     },
     "fetch": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-everything"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch"
+      ],
       "enabled": false,
-      "description": "General purpose utilities and test tools"
+      "description": "Web page fetcher and HTML-to-markdown converter"
+    },
+    "brave_search": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": ""
+      },
+      "enabled": false,
+      "description": "Web search via Brave Search API"
+    },
+    "git": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-git"
+      ],
+      "enabled": false,
+      "description": "Local Git repository inspection and commits"
+    },
+    "everything": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-everything"
+      ],
+      "enabled": false,
+      "description": "Reference MCP server demonstrating all tools and prompts"
+    },
+    "gmail": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@shinzolabs/gmail-mcp"
+      ],
+      "enabled": true,
+      "description": "Gmail MCP server for searching, reading, drafting, and sending emails"
     }
   }
 }

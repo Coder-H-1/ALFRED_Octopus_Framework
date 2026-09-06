@@ -39,9 +39,27 @@ def set_screen_brightness(level: int) -> Dict[str, Any]:
     target = max(0, min(100, int(level)))
     try:
         sbc.set_brightness(target)
-        return {"status": f"Display brightness set to {target}%.", "brightness": target}
+        return {"status": f"Display brightness set to {target}%, sir.", "brightness": target}
     except Exception as e:
         return {"error": f"Failed to set brightness: {e}"}
+
+
+@mcp_tool(
+    name="adjust_screen_brightness",
+    description="Adjust screen brightness up or down relatively. Direction can be 'increase' or 'decrease'.",
+    category="device"
+)
+def adjust_screen_brightness(direction: str = "increase", amount: int = 10) -> Dict[str, Any]:
+    """Adjusts primary display brightness relatively."""
+    try:
+        current = sbc.get_brightness()
+        cur_val = current[0] if isinstance(current, list) else current
+        delta = amount if direction.lower() in ["increase", "up", "raise", "higher", "brighter"] else -amount
+        new_val = max(0, min(100, int(cur_val + delta)))
+        sbc.set_brightness(new_val)
+        return {"status": f"Brightness adjusted to {new_val}%, sir.", "brightness": new_val}
+    except Exception as e:
+        return {"error": f"Failed to adjust brightness: {e}"}
 
 
 @mcp_tool(
@@ -54,6 +72,6 @@ def get_screen_brightness() -> Dict[str, Any]:
     try:
         current = sbc.get_brightness()
         val = current[0] if isinstance(current, list) else current
-        return {"status": f"Current screen brightness is {val}%.", "brightness": val}
+        return {"status": f"Current screen brightness is {val}%, sir.", "brightness": val}
     except Exception as e:
         return {"error": f"Failed to read brightness: {e}"}

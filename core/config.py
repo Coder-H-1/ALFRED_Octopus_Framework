@@ -11,7 +11,7 @@ _TOOLS_DIR = os.path.join(_BASE_DIR, "tools")
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "node_max_old_space_size_mb": 64,
-    "idle_timeout_seconds": 60,
+    "idle_timeout_seconds": 120,
     "aggressive_gc": True,
     "serialization": "orjson"
 }

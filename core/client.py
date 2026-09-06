@@ -31,7 +31,7 @@ class StdioMCPClient:
         self.env = env or os.environ.copy()
         
         settings = get_settings()
-        self.idle_timeout = settings.get("idle_timeout_seconds", 60)
+        self.idle_timeout = settings.get("idle_timeout_seconds", 120)
         self.node_max_old_space = settings.get("node_max_old_space_size_mb", 64)
         self.aggressive_gc = settings.get("aggressive_gc", True)
 
